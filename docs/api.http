@@ -1,0 +1,47 @@
+### Environment
+@baseUrl = http://localhost:8000
+@json = application/json
+
+### Health
+GET {{baseUrl}}/health
+Accept: application/json
+
+### List todos
+GET {{baseUrl}}/todos
+Accept: {{json}}
+
+### Get todo by id
+GET {{baseUrl}}/todos/1
+Accept: {{json}}
+
+### Create todo
+POST {{baseUrl}}/todos
+Content-Type: {{json}}
+Accept: {{json}}
+
+{
+  "title": "Write docs",
+  "done": false
+}
+
+### Update todo (title)
+PUT {{baseUrl}}/todos/1
+Content-Type: {{json}}
+Accept: {{json}}
+
+{
+  "title": "Learn Slim 4"
+}
+
+### Update todo (toggle done)
+PUT {{baseUrl}}/todos/1
+Content-Type: {{json}}
+Accept: {{json}}
+
+{
+  "done": true
+}
+
+### Delete todo
+DELETE {{baseUrl}}/todos/1
+Accept: {{json}}

@@ -1,0 +1,1 @@
+{"version":2,"defects":[],"times":{"HealthTest::testHealthEndpointReturnsOk":0.292,"DatabaseConnectionTest::testPdoSqliteConnectionIsAvailable":1.038,"DatabaseConnectionTest::testTodosTableExistsOrIsAutoCreated":0.073}}

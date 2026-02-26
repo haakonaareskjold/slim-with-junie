@@ -4,76 +4,82 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Todo;
-use PDO;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Tools\SchemaTool;
 
 final class TodoService
 {
-    public function __construct(private PDO $pdo)
+    public function __construct(private EntityManagerInterface $entityManager)
     {
         $this->initializeSchema();
     }
 
     private function initializeSchema(): void
     {
-        $this->pdo->exec('CREATE TABLE IF NOT EXISTS todos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            done INTEGER NOT NULL DEFAULT 0
-        )');
+        $tool = new SchemaTool($this->entityManager);
+        $classes = [
+            $this->entityManager->getClassMetadata(Todo::class),
+        ];
+
+        // In a real application, you'd use migrations.
+        // For this refactor, we keep the auto-initialization behavior.
+        // updateSchema is safe to call if schema is already up to date.
+        $tool->updateSchema($classes, true);
     }
 
     /** @return list<array<string, mixed>> */
     public function all(): array
     {
-        $stmt = $this->pdo->query('SELECT id, title, done FROM todos ORDER BY id');
-        $rows = $stmt->fetchAll();
-        return array_map(fn(array $r) => [
-            'id' => (int)$r['id'],
-            'title' => (string)$r['title'],
-            'done' => (bool)$r['done'],
-        ], $rows);
+        $repository = $this->entityManager->getRepository(Todo::class);
+        $todos = $repository->findBy([], ['id' => 'ASC']);
+
+        return array_map(fn(Todo $todo) => $todo->toArray(), $todos);
     }
 
     public function find(int $id): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, title, done FROM todos WHERE id = :id');
-        $stmt->execute([':id' => $id]);
-        $row = $stmt->fetch();
-        if ($row === false) {
-            return null;
-        }
-        return [
-            'id' => (int)$row['id'],
-            'title' => (string)$row['title'],
-            'done' => (bool)$row['done'],
-        ];
+        $todo = $this->entityManager->find(Todo::class, $id);
+        return $todo?->toArray();
     }
 
     public function create(string $title, bool $done = false): array
     {
-        $stmt = $this->pdo->prepare('INSERT INTO todos (title, done) VALUES (:title, :done)');
-        $stmt->execute([':title' => $title, ':done' => $done ? 1 : 0]);
-        $id = (int)$this->pdo->lastInsertId();
-        return ['id' => $id, 'title' => $title, 'done' => $done];
+        $todo = new Todo($title, $done);
+        $this->entityManager->persist($todo);
+        $this->entityManager->flush();
+
+        return $todo->toArray();
     }
 
     public function update(int $id, ?string $title, ?bool $done): ?array
     {
-        $existing = $this->find($id);
-        if ($existing === null) {
+        $todo = $this->entityManager->find(Todo::class, $id);
+        if ($todo === null) {
             return null;
         }
-        $newTitle = $title !== null ? $title : $existing['title'];
-        $newDone = $done !== null ? $done : $existing['done'];
-        $stmt = $this->pdo->prepare('UPDATE todos SET title = :title, done = :done WHERE id = :id');
-        $stmt->execute([':title' => $newTitle, ':done' => $newDone ? 1 : 0, ':id' => $id]);
-        return ['id' => $id, 'title' => $newTitle, 'done' => $newDone];
+
+        if ($title !== null) {
+            $todo->setTitle($title);
+        }
+        if ($done !== null) {
+            $todo->setDone($done);
+        }
+
+        $this->entityManager->flush();
+
+        return $todo->toArray();
     }
 
     public function delete(int $id): bool
     {
-        $stmt = $this->pdo->prepare('DELETE FROM todos WHERE id = :id');
-        $stmt->execute([':id' => $id]);
-        return $stmt->rowCount() > 0;
+        $todo = $this->entityManager->find(Todo::class, $id);
+        if ($todo === null) {
+            return false;
+        }
+
+        $this->entityManager->remove($todo);
+        $this->entityManager->flush();
+
+        return true;
     }
 }
